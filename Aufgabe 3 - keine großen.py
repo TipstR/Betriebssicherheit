@@ -226,18 +226,15 @@ def fault_tree_2_bdd(top_node, graph):
 def createAnd(top_node, origin=None):
     global allEvents
 
+    if origin is None:
+        pass
+    else:
+        origin.one = top_node.nodes[0]
+
     for i in range(len(top_node.nodes)):
         if type(top_node.nodes[i]) == Event:
             allEvents.append(top_node.nodes[i])
-            temporary = top_node.zero.connection
-            while True:
-                if type(temporary) == Event:
-                    top_node.nodes[i].zero = temporary
-                    break
-                elif temporary is None:
-                    break
-                else:
-                    temporary = temporary.nodes[0]
+            top_node.nodes[i].zero = None
 
             if i == len(top_node.nodes) - 1:
                 top_node.nodes[i].one = top_node.one.connection
@@ -245,20 +242,20 @@ def createAnd(top_node, origin=None):
                 top_node.nodes[i].one = top_node.nodes[i + 1]
 
         elif type(top_node.nodes[i]) == AndNode:
-            top_node.nodes[i].zero.connection = top_node
+            top_node.nodes[i].zero.connection = top_node.zero.connection
             if i == len(top_node.nodes) - 1:
-                top_node.nodes[i].one.connection = top_node
+                top_node.nodes[i].one.connection = top_node.one.connection
             else:
-                top_node.nodes[i].one.connection = top_node.nodes[i + 1]
+                top_node.nodes[i].one.connection = top_node.nodes[i + 1].nodes[0]
 
             createAnd(top_node.nodes[i], top_node.nodes[i - 1])
 
         elif type(top_node.nodes[i]) == OrNode:
-            top_node.nodes[i].one.connection = top_node
+            top_node.nodes[i].one.connection = top_node.one.connection
             if i == len(top_node.nodes) - 1:
-                top_node.nodes[i].zero.connection = top_node
+                top_node.nodes[i].zero.connection = top_node.zero.connection
             else:
-                top_node.nodes[i].zero.connection = top_node.nodes[i + 1]
+                top_node.nodes[i].zero.connection = top_node.nodes[i + 1].nodes[0]
 
             createOr(top_node.nodes[i], top_node.nodes[i - 1])
 
@@ -269,15 +266,7 @@ def createOr(top_node, origin=None):
     for i in range(len(top_node.nodes)):
         if type(top_node.nodes[i]) == Event:
             allEvents.append(top_node.nodes[i])
-            temporary = top_node.one.connection
-            while True:
-                if type(temporary) == Event:
-                    top_node.nodes[i].one = temporary
-                    break
-                elif temporary is None:
-                    break
-                else:
-                    temporary = temporary.nodes[0]
+            top_node.nodes[i].one = top_node.one.connection
 
             if i == len(top_node.nodes) - 1:
                 top_node.nodes[i].zero = top_node.zero.connection
@@ -285,74 +274,48 @@ def createOr(top_node, origin=None):
                 top_node.nodes[i].zero = top_node.nodes[i + 1]
 
         elif type(top_node.nodes[i]) == AndNode:
-            if origin is None:
-                top_node.nodes[i].one.connection = None
-            else:
-                top_node.nodes[i].one.connection = top_node.next_connection
+            top_node.nodes[i].zero.connection = top_node.zero.connection
             if i == len(top_node.nodes) - 1:
-                if origin is None:
-                    top_node.nodes[i].zero.connection = top_node.zero.connection
-                else:
-                    top_node.nodes[i].zero.connection = top_node.zero.connection
+                top_node.nodes[i].one.connection = top_node.one.connection
             else:
-                top_node.nodes[i].zero.connection = top_node.nodes[i + 1]
+                top_node.nodes[i].one.connection = top_node.nodes[i + 1].nodes[0]
 
             createAnd(top_node.nodes[i], top_node.nodes[i - 1])
 
         elif type(top_node.nodes[i]) == OrNode:
-            top_node.nodes[i].one.connection = top_node
+            top_node.nodes[i].one.connection = top_node.one.connection
             if i == len(top_node.nodes) - 1:
-                top_node.nodes[i].zero.connection = top_node
+                top_node.nodes[i].zero.connection = top_node.zero.connection
             else:
-                top_node.nodes[i].zero.connection = top_node.nodes[i + 1]
+                top_node.nodes[i].zero.connection = top_node.nodes[i+1].nodes[0]
 
             createOr(top_node.nodes[i], top_node.nodes[i - 1])
 
 
-k1 = OrNode("K1")
-k2 = AndNode("K2")
-k3 = AndNode("K3")
-k4 = AndNode("K4")
-k5 = OrNode("K5")
-a = Event("a")
-b = Event("b")
-c = Event("c")
-d = Event("d")
-e = Event("e")
-f = Event("f")
-g = Event("g")
+top = OrNode('TOP')
+a = OrNode('A')
+b = OrNode('B')
 
-k1.add(k2)
-k1.add(k3)
-k2.add(d)
-k2.add(e)
-k2.add(k4)
-k3.add(f)
-k3.add(g)
-k4.add(k5)
-k4.add(c)
-k5.add(a)
-k5.add(b)
+e1 = Event('E1')
+e2 = Event('E2')
+e3 = Event('E3')
+e4 = Event('E4')
+
+a.add(e3)
+a.add(e4)
+
+b.add(e1)
+b.add(e2)
+
+top.add(b)
+top.add(a)
 
 fault_tree_graph = graphviz.Graph("fault_tree")
-fault_tree_graph = k1.make_graph(fault_tree_graph)
+fault_tree_graph = top.make_graph(fault_tree_graph)
 fault_tree_graph.view()
 
 bdd_graph = graphviz.Graph("BDD")
-bdd_graph = fault_tree_2_bdd(k1, bdd_graph)
+bdd_graph = fault_tree_2_bdd(top, bdd_graph)
 print("DEBUG")
 bdd_graph.view()
 
-print("K1: ", k1.zero)
-print("K1: ", k1.one)
-print("K2: ", k2.zero)
-print("K2: ", k2.one)
-print("K3: ", k3.zero)
-print("K3: ", k3.one)
-print("K4: ", k4.zero)
-print("K4: ", k4.one)
-print("K5: ", k5.zero)
-print("K5: ", k5.one)
-
-print("a: ", a.one)
-print("a: ", a.zero)
